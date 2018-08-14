@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+
+import subprocess
+
+import json
+# 'compact' format json encode (no spaces)
+json_enc = json.JSONEncoder(separators=(",",":")).encode
+
+import adjust
+
+MY_VERSION = "aggregator 1.0"
+DRIVERS_DIR = "adjust.d"
+
+def run(path, *args, data = None):
+
+    if data:
+        data = json_enc(data).encode("UTF-8")
+    r = subprocess.check_output([path]+list(args), input = data)
+
+    return json.loads(r.decode("UTF-8"))
+
+
+def locate_drivers():
+    drivers = []
+    for e in os.listdir(DRIVERS_DIR):
+        p = os.path.join(DRIVERS_DIR,e)
+        if not (os.path.isfile(p) and os.access(p, os.X_OK)):
+            continue
+        info = run(p, "--info") # may raise an exception
+        drivers.append( (p, info) ) 
+        drivers.sort() # by the relative path, which by construction is simply 'by file name' here
+
+    return drivers
+
+
+def _version():
+    ver = MY_VERSION
+    dvers = ", ".join( [info["version"] for d,info in drivers] )
+    return "{} ({})".format(ver, dvers)
+
+
+def info():
+    ver = _version()
+    has_cancel = all( ( info.get("has_cancel", False)  for d,info in drivers ) )
+
+    print (json_enc( { "version":ver, "has_cancel":has_cancel } ))
+
+
+g_state = {} # saved --query output from each driver
+
+def merge_settings(dest, src):
+    """merge src['settings'] into dest['settings'], raise exception if the
+    same setting is defined in both"""
+
+    settings = dest.setdefault("settings",{})
+    for sn,sv in src.get("settings",{}).items():
+        if sn in settings:
+            raise ValueError(sn)
+        settings[sn] = sv
+
+    return
+
+def _query(app_id='app'):
+    comps = {}
+
+    # first, read and save
+    for d,info in drivers:
+        #
+        q = run(d, '--query', app_id)
+        g_state[d] = q
+
+    # merge after all data is collected
+    for d,info in drivers:
+        # TODO: s[application] (global app settings not supported for now)
+        for cn, cd in g_state[d]["application"]["components"].items():
+            c = comps.setdefault(cn, {})
+            try:
+                merge_settings(c, cd) # merge *into* c; raises error on conflicts
+            except ValueError as x:
+                # re-raise with context info
+                # NOTE we don't keep track where the first one came from, just report the current driver as the culprit
+                raise ValueError("{}: duplicate setting for component {}: {}".format(os.path.basename(d), cn, str(x)))
+
+    return {"application" : { "components" : comps }}
+
+
+def _adjust(app_id, new_settings):
+    q = _query() # this should populate g_state
+    comps = q["application"]["components"]
+    new_settings = new_settings.get("application",{}).get("components",{})
+
+    for d,info in drivers:
+        # extract settings for this driver only
+        dsettings = {}
+        dstate = g_state[d]
+        for cn,cs in dstate["application"]["components"].items(): # FIXME 'components' optional?
+            print("C:", cn)
+            for sn, sv in cs.get("settings",{}).items():
+                print("    S:", sn)
+                new_setting = new_settings.get(cn,{}).get("settings",{}).get(sn,None)
+                if new_setting is not None:
+                    dsettings.setdefault(cn,{}).setdefault("settings",{})[sn] = new_setting
+
+        run(d, app_id, data = {"application":{"components":{"settings":dsettings}}} )
+
+class A(adjust.Adjust):
+
+    def query(self):
+        return _query()
+
+    def adjust(self, data):
+        _adjust(self.app_id, data)
+        return # return nothing
+
+    def info(self):
+        ver = self.version # _version() - already set on obj create
+        has_cancel = all( ( info.get("has_cancel", False)  for d,info in drivers ) )
+        return { "version":ver, "has_cancel":has_cancel }
+
+
+if __name__ == "__main__":
+    drivers = locate_drivers()
+    # print(drivers)
+
+    try:
+        i = A(_version(), "adjust aggregator, runs all drivers in ./adjust.d/", False)
+    except Exception as x:
+        # TODO
+        raise
+
+    i.run()
+    print (g_state)
+    info()

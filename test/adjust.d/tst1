@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+
+import adjust
+
+v1 = { "type" : "range", "value" : 1, "min":0, "max":10 }
+v2 = { "type" : "range", "value" : 3, "min":0, "max":20 }
+
+state_tst1 = {
+    "c1" : {"settings":{ "s1" : v1 }}
+}
+
+state_tst2 = {
+    "c1" : {"settings":{ "s2" : v2 }},
+    "c2" : {"settings":{ "s3" : v1, "s4" : v2 }}
+}
+
+state_tst3 = {
+    "c3" : {"settings":{ "s2" : v2 }}
+}
+
+
+state={
+    "tst1" : state_tst1,
+    "tst2" : state_tst2,
+    "abc1" : state_tst3,
+    "dup" : state_tst3,
+}
+
+class A(adjust.Adjust):
+
+    def query(self):
+        comps = {}
+        desc = { "components" : state[me] }
+        return desc
+
+    def adjust(self, input_data):
+        print( "TEST ADJ:", me, input_data, file=sys.stderr)
+
+if __name__ == "__main__":
+    me = os.path.basename(sys.argv[0])
+
+    try:
+        i = A(me+" 1.0", "(todo - help text)", False)
+    except Exception as x:
+        # TODO
+        raise
+
+    i.run()
