@@ -38,6 +38,9 @@ class A(adjust.Adjust):
 
     def adjust(self, input_data):
         print( "TEST ADJ:", me, input_data, file=sys.stderr)
+        print( '{"progress":20}', flush = True )
+        print( '{"progress":60}', flush = True )
+        raise Exception("blah!")
 
 if __name__ == "__main__":
     me = os.path.basename(sys.argv[0])
