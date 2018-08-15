@@ -89,7 +89,7 @@ class Adjust(object):
         try:
             # self.debug("Reading stdin")
             input_data = json.loads(sys.stdin.read())
-            self.input_data = input_data
+            self.input_data = input_data # LEGACY mode, remove when drivers are updated to use arg
         except Exception as e:
             self.print_json_error(
                 e.__class__.__name__,
@@ -100,8 +100,11 @@ class Adjust(object):
 
         # Adjust // TODO: print output??
         try:
-            print(self.adjust.__code__.co_argcount, file=sys.stderr)
-            self.adjust(input_data)
+            c = self.adjust.__code__.co_argcount
+            if c == 2:
+                self.adjust(input_data)
+            else:
+                self.adjust() # LEGACY mode
             # if the above didn't raise an exception, all done (empty completion data, status 'ok')
             print(json.dumps(dict(status='ok')))
         except Exception as e:

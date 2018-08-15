@@ -10,6 +10,7 @@ import json
 json_enc = json.JSONEncoder(separators=(",",":")).encode
 
 import adjust
+from util import run_and_track
 
 MY_VERSION = "aggregator 1.0"
 DRIVERS_DIR = "adjust.d"
@@ -92,19 +93,59 @@ def _adjust(app_id, new_settings):
     comps = q["application"]["components"]
     new_settings = new_settings.get("application",{}).get("components",{})
 
+
+    # prepare data for all drivers first (skipping those with nothing to do)
+    run_lst = []
     for d,info in drivers:
         # extract settings for this driver only
         dsettings = {}
         dstate = g_state[d]
         for cn,cs in dstate["application"]["components"].items(): # FIXME 'components' optional?
-            print("C:", cn)
+            # print("C:", cn)
             for sn, sv in cs.get("settings",{}).items():
-                print("    S:", sn)
+                # print("    S:", sn)
                 new_setting = new_settings.get(cn,{}).get("settings",{}).get(sn,None)
                 if new_setting is not None:
                     dsettings.setdefault(cn,{}).setdefault("settings",{})[sn] = new_setting
 
-        run(d, app_id, data = {"application":{"components":{"settings":dsettings}}} )
+        if dsettings: # skip if there's nothing for this driver
+            run_lst.append( (d, {"application":{"components":{"settings":dsettings}}} ) )
+
+    # progress ratios - assume all driver have equal weight
+    p = 1.0/float(len(run_lst))
+    p_weight = { d:p for d,_ in run_lst }
+    p_progress = { d:0.0 for d,_ in run_lst }
+    p_status = {}
+
+    for d, data in run_lst:
+        def cbk(args):
+            try:
+                p = args["progress"]
+            except KeyError:
+                return # nothing to do
+            p = float(p)/100.0
+            p_progress[d] = p
+            total = int ( sum( (v * p_weight[k] for k,v in p_progress.items()) ) * 100.0 )
+            if total>100: total = 100
+            print ( json_enc( {"progress": total} ) )
+        #
+        s = run_and_track(d, app_id, progress_cb = cbk, data = data )
+        p_status[d] = s
+        # assume completed (NOTE: regardless of status)
+        cbk( {"progress":100} )
+
+    # aggregate status
+    ok = all( (x["status"] == "ok" for x in p_status.values()) )
+    if ok:
+        return
+
+    # FIXME: change base class to support a return value! (so we can return a structured err instead of raise Exc())
+    # failure: cook a message from all failed drivers
+    msg = []
+    for d,s in p_status.items():
+        if s["status"] == "ok": continue
+        msg.append("{}: {}: {}".format(os.path.basename(d), s["status"], s.get("message","")))
+    raise Exception( "\n".join(msg) )
 
 class A(adjust.Adjust):
 
@@ -122,6 +163,7 @@ class A(adjust.Adjust):
 
 
 if __name__ == "__main__":
+    os.environ["PYTHONPATH"] = os.getcwd() # TODO: append to the path, in case it is set
     drivers = locate_drivers()
     # print(drivers)
 
@@ -132,5 +174,4 @@ if __name__ == "__main__":
         raise
 
     i.run()
-    print (g_state)
-    info()
+    print (g_state, file=sys.stderr)
