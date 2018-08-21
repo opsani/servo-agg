@@ -3,6 +3,7 @@ import os
 import subprocess
 import select
 import json
+import threading
 
 import typing
 
@@ -11,6 +12,16 @@ class _a(object): pass
 # config - FIXME
 g_args = _a()
 g_args.verbose = False
+
+# global state flags: set when cancel or terminate is requested
+g_state = {
+    "terminate": False,
+    "cancel": False
+}
+g_children = {} # subprocess.Popen objects, keyed by id(proc)
+# critical section for changes in g_state and g_children, used to ensure new sub-processes are
+# placed in g_children before waiting on them to exit
+g_lock = threading.RLock()
 
 #def run_and_track(driver, app, req = None, describe = False, progress_cb: typing.Callable[..., None] = None):
 def run_and_track(path, *args, data = None, progress_cb: typing.Callable[..., None] = None):
@@ -41,7 +52,19 @@ def run_and_track(path, *args, data = None, progress_cb: typing.Callable[..., No
         stdin = b''         # no stdin
 
     # execute driver, providing request and capturing stdout/stderr
-    proc = subprocess.Popen(cmd, bufsize=0, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+    with g_lock:
+        # don't start anything if canceling or terminating
+        if g_state["cancel"]:
+            return {"status":"canceled"}
+        if g_state["terminate"]:
+            return {"status":"terminated"}
+        proc = subprocess.Popen(cmd, bufsize=0, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+        #TBD FIXME: if Popen can be interrupted by a signal, this can be re-entered despite the lock (if
+        # called from the main thread, because the lock is re-entrant and the signal comes on the main thread)
+        # in that case, we have to check the cancel/terminate flags again after proc create and terminate it
+        # right away.
+        g_children[id(proc)] = proc
+
     stderr = [] # collect all stderr here
     rsp = {"status": "nodata"} # in case driver outputs nothing at all
     wi = [proc.stdin]
@@ -74,6 +97,8 @@ def run_and_track(path, *args, data = None, progress_cb: typing.Callable[..., No
                 except Exception as x:
                     proc.terminate()
                     # TODO: handle exception in json.loads?
+                    with g_lock:
+                        del g_children[id(proc)]
                     raise
                 if stdout:
                     progress_cb(stdout)
@@ -88,6 +113,9 @@ def run_and_track(path, *args, data = None, progress_cb: typing.Callable[..., No
                 proc.stdin.write(stdin[:l])
                 stdin = stdin[l:]
         # if e:
+
+    with g_lock:
+        del g_children[id(proc)]
 
     rc = proc.returncode
     if g_args.verbose or rc != 0:
@@ -111,4 +139,28 @@ def run_and_track(path, *args, data = None, progress_cb: typing.Callable[..., No
         # else don't send any bit of stderr
 
     return rsp
+
+def run_and_track_terminate():
+    """terminate all processes started by run_and_track()"""
+
+    with g_lock:
+        g_state["terminate"] = True
+        # take reference of all running procs under lock
+        lst = g_children.values()
+
+    # not in lock, g_children can't grow any more once terminate or cancel is set
+    for p in lst:
+        p.terminate()
+
+def run_and_track_cancel():
+    """send SIGUSR1 to all processes started by run_and_track(). Any process that doesn't exit with its own exit message will get {"status":"canceled"} """
+
+    with g_lock:
+        g_state["cancel"] = True
+        # take reference of all running procs under lock
+        lst = g_children.values()
+
+    # not in lock, g_children can't grow any more once terminate or cancel is set
+    for p in lst:
+        p.send_signal(signal.SIGUSR1)
 
