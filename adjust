@@ -11,6 +11,7 @@ import json
 json_enc = json.JSONEncoder(separators=(",",":")).encode
 
 import adjust
+import util
 from util import run_and_track
 
 MY_VERSION = "aggregator 1.0"
@@ -110,7 +111,7 @@ def _adjust(app_id, new_settings):
                     dsettings.setdefault(cn,{}).setdefault("settings",{})[sn] = new_setting
 
         if dsettings: # skip if there's nothing for this driver
-            run_lst.append( (d, {"application":{"components":{"settings":dsettings}}} ) )
+            run_lst.append( (d, {"application":{"components":dsettings}} ) )
 
     # progress ratios - assume all driver have equal weight
     p = 1.0/float(len(run_lst))
@@ -188,4 +189,4 @@ if __name__ == "__main__":
         raise
 
     i.run()
-    print (g_state, file=sys.stderr)
+#    print (g_state, file=sys.stderr)
