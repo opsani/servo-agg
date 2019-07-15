@@ -15,6 +15,7 @@ To use the aggregator:
 
 The resulting directory structure should look like this:
 
+```
 /servo/             # <= this will be the current directory when ‘adjust’ is ran
       /config.yaml  # configuration for the drivers
       /adjust       # the aggregator executable
@@ -26,12 +27,13 @@ The resulting directory structure should look like this:
                /driver2  # executable
                /datafile # not executable
                /...
+```
 
 NOTE:the only files in `adjust.d` that have the executable flag should be one or more `adjust` drivers. If the driver requires any supporting executables of its own, they should be installed elsewhere (OK to place them in a sub-directory of `adjust.d`)
 
 After copying all files, the setup can be tested by running:
 
-	./adjust --version
+	`./adjust --version`
 
 This should display a version string that includes the aggregator's own version followed by the versions of all drivers in `adjust.d` in parentheses.
 
@@ -39,7 +41,7 @@ This should display a version string that includes the aggregator's own version 
 
 The aggregator behaves like a normal `adjust` driver and will be recognized as such by the `servo` agent.
 
-When performing adjust, the drivers are ran in sequence (ordered by file name).
+When performing adjust, the drivers are ran in sequence (ordered by file name). Since adjust drivers are usually called `adjust`, they will need to be renamed anyway when placed in `adjust.d/`. It is OK to use the System V init-style naming, (e.g., `01ec2asg`, `02winec2` to execute the `ec2asg` driver first, followed by the the `winec2` driver. Note that each driver will look for its specific name in the `config.yaml` configuration file (e.g., `ec2asg` and `winec2` in this example), regardless of that the file names in `adjust.d/` are.
 
 Progress is reported on the assumption that all drivers take the same time to run: each driver's progress advance is divided by the number of drivers to compute the overall advance (e.g., with 3 drivers, a driver that advances by 30% will be seen as 10% overall advance of the aggregator). Progress advance will be reported also after each driver's completion even if that driver did not send any interim progress messages (i.e., at the very least, there will be as many progress messages sent as there are drivers).
 
