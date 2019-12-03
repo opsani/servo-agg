@@ -23,6 +23,9 @@ g_children = {} # subprocess.Popen objects, keyed by id(proc)
 # placed in g_children before waiting on them to exit
 g_lock = threading.RLock()
 
+DRIVER_IO_TIMEOUT = 20 # max time to wait for driver to send output; this should be more than the max time between progress updates (30sec)
+DRIVER_EXIT_TIMEOUT = 3 # max time to wait for driver to exit
+
 #def run_and_track(driver, app, req = None, describe = False, progress_cb: typing.Callable[..., None] = None):
 def run_and_track(path, *args, data = None, progress_cb: typing.Callable[..., None] = None):
     '''
@@ -67,25 +70,39 @@ def run_and_track(path, *args, data = None, progress_cb: typing.Callable[..., No
 
     stderr = [] # collect all stderr here
     rsp = {"status": "nodata"} # in case driver outputs nothing at all
+    ri = [proc.stdout, proc.stderr]
     wi = [proc.stdin]
     ei = [proc.stdin, proc.stdout,proc.stderr]
     eof_stdout = False
     eof_stderr = False #
     while True:
-        r,w,e = select.select([proc.stdout,proc.stderr], wi, ei )
-        if eof_stdout and eof_stderr and proc.poll() is not None: # process exited and no more data
+        if eof_stdout and eof_stderr:
+            if proc.poll() is not None: # process exited and no more data
+                break
+            try:
+                proc.wait(DRIVER_EXIT_TIMEOUT) # don't wait forever
+            except subprocess.TimeoutExpired:
+                print("WARNING: killed stuck child process ({})".format(repr(cmd)), file=sys.stderr)
+                proc.kill()
             break
+        r,w,e = select.select(ri, wi, ei, DRIVER_IO_TIMEOUT)
+        if not r and not w and not e: # timed out
+            proc.terminate()
+            print("timed out waiting for child process ({}) output".format(repr(cmd)), file=sys.stderr)
+            continue # continue waiting until it exits, to handle process termination as any other error
         for h in r:
             if h is proc.stderr:
                 l = h.read(4096)
                 if not l:
                     eof_stderr = True
+                    ri.remove(proc.stderr) # remove from select list (once in EOF, it will always stay 'readable')
                     continue
                 stderr.append(l)
             else: # h is proc.stdout
                 l = h.readline()
                 if not l:
                     eof_stdout = True
+                    ri.remove(proc.stdout)
                     continue
                 stdout_line = l.strip().decode("UTF-8") # there will always be a complete line, driver writes one line at a time
                 if g_args.verbose:
