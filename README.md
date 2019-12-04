@@ -45,4 +45,10 @@ When performing adjust, the drivers are ran in sequence (ordered by file name). 
 
 Progress is reported on the assumption that all drivers take the same time to run: each driver's progress advance is divided by the number of drivers to compute the overall advance (e.g., with 3 drivers, a driver that advances by 30% will be seen as 10% overall advance of the aggregator). Progress advance will be reported also after each driver's completion even if that driver did not send any interim progress messages (i.e., at the very least, there will be as many progress messages sent as there are drivers).
 
+### Environment variables
+
+| *Variable* | *Description* |
+| --- | --- |
+| OPTUNE_IO_TIMEOUT | Maximum time (seconds) to wait for a driver to send a progress or completion message. Default is empty (unlimited time). NOTE this setting is the same as the one used by `servo` as well. The aggregator waits one second less, to time out first and kill only the unresponsive driver, rather than make itself be treated as unresponsive by `servo`|
+
 

@@ -23,8 +23,13 @@ g_children = {} # subprocess.Popen objects, keyed by id(proc)
 # placed in g_children before waiting on them to exit
 g_lock = threading.RLock()
 
-DRIVER_IO_TIMEOUT = 20 # max time to wait for driver to send output; this should be more than the max time between progress updates (30sec)
 DRIVER_EXIT_TIMEOUT = 3 # max time to wait for driver to exit
+# max time to wait for driver to send output; this should be more than the max time between progress updates (30sec)
+DRIVER_IO_TIMEOUT = os.environ.get("OPTUNE_IO_TIMEOUT", None)
+if DRIVER_IO_TIMEOUT:
+    DRIVER_IO_TIMEOUT = max(int(DRIVER_IO_TIMEOUT)-1, 0) # one less, to time out before 'servo' does
+if not DRIVER_IO_TIMEOUT:
+    DRIVER_IO_TIMEOUT = None # treat undefined, empty or "0" value as 'infinite'
 
 #def run_and_track(driver, app, req = None, describe = False, progress_cb: typing.Callable[..., None] = None):
 def run_and_track(path, *args, data = None, progress_cb: typing.Callable[..., None] = None):
