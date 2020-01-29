@@ -3,6 +3,7 @@
 import sys
 import os
 import signal
+import yaml
 
 import subprocess
 
@@ -16,6 +17,7 @@ from util import run_and_track
 
 MY_VERSION = "aggregator 1.0"
 DRIVERS_DIR = "adjust.d"
+DESC_FILE = "./config.yaml"
 
 def run(path, *args, data = None):
 
@@ -155,7 +157,17 @@ def _adjust(app_id, new_settings):
 class A(adjust.Adjust):
 
     def query(self):
-        return _query()
+        q = _query()
+
+        # Read config if present
+        try:
+            with open(DESC_FILE, 'r') as f:
+                cfg=yaml.safe_load(f)
+            q["application"]["annotations"] = cfg["promotion"]
+        except:
+            pass
+
+        return q
 
     def adjust(self, data):
         _adjust(self.app_id, data)
