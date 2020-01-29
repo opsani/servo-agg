@@ -33,7 +33,7 @@ def locate_drivers():
         if not (os.path.isfile(p) and os.access(p, os.X_OK)):
             continue
         info = run(p, "--info") # may raise an exception
-        drivers.append( (p, info) ) 
+        drivers.append( (p, info) )
         drivers.sort() # by the relative path, which by construction is simply 'by file name' here
 
     return drivers
@@ -93,7 +93,7 @@ def _query(app_id='app'):
 def _adjust(app_id, new_settings):
     q = _query() # this should populate g_state
     comps = q["application"]["components"]
-    new_settings = new_settings.get("application",{}).get("components",{})
+    comp_settings = new_settings.get("application",{}).get("components",{})
 
 
     # prepare data for all drivers first (skipping those with nothing to do)
@@ -106,12 +106,15 @@ def _adjust(app_id, new_settings):
             # print("C:", cn)
             for sn, sv in cs.get("settings",{}).items():
                 # print("    S:", sn)
-                new_setting = new_settings.get(cn,{}).get("settings",{}).get(sn,None)
+                new_setting = comp_settings.get(cn,{}).get("settings",{}).get(sn,None)
                 if new_setting is not None:
                     dsettings.setdefault(cn,{}).setdefault("settings",{})[sn] = new_setting
 
         if dsettings: # skip if there's nothing for this driver
-            run_lst.append( (d, {"application":{"components":dsettings}} ) )
+            driver_data = {"application": {"components": dsettings}}
+            if "control" in new_settings:
+                driver_data["control"] = new_settings["control"]
+            run_lst.append((d, driver_data))
 
     # progress ratios - assume all driver have equal weight
     p = 1.0/float(len(run_lst))
