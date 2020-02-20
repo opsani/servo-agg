@@ -93,7 +93,7 @@ def _query(app_id='app'):
 
 
 def _adjust(app_id, new_settings):
-    q = _query() # this should populate g_state
+    q = _query(app_id) # this should populate g_state
     comps = q["application"]["components"]
     comp_settings = new_settings.get("application",{}).get("components",{})
 
@@ -157,7 +157,7 @@ def _adjust(app_id, new_settings):
 class A(adjust.Adjust):
 
     def query(self):
-        q = _query()
+        q = _query(self.app_id)
 
         # Read config if present
         try:
