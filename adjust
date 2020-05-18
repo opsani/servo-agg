@@ -15,7 +15,7 @@ import adjust
 import util
 from util import run_and_track
 
-MY_VERSION = "aggregator 1.0"
+MY_VERSION = "aggregator 1.1"
 DRIVERS_DIR = "adjust.d"
 DESC_FILE = "./config.yaml"
 
@@ -149,10 +149,16 @@ def _adjust(app_id, new_settings):
     # FIXME: change base class to support a return value! (so we can return a structured err instead of raise Exc())
     # failure: cook a message from all failed drivers
     msg = []
+    combined_status="failed"
     for d,s in p_status.items():
         if s["status"] == "ok": continue
+
+        # Rejected status takes precedence
+        if s["status"] == "rejected" or combined_status != "rejected":
+            combined_status = s["status"]
+
         msg.append("{}: {}: {}".format(os.path.basename(d), s["status"], s.get("message","")))
-    raise Exception( "\n".join(msg) )
+    raise adjust.AdjustError( "\n".join(msg), status=combined_status )
 
 class A(adjust.Adjust):
 
