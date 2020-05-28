@@ -60,8 +60,8 @@ class Adjust(object):
             sys.exit(0)
 
         if self.args.info:
-            print(json.dumps(
-                {"version": self.version, "has_cancel": self.supports_cancel}))
+            print('{}\n'.format(json.dumps(
+                {"version": self.version, "has_cancel": self.supports_cancel})), end='')
             sys.exit(0)
 
         # Valcheck
@@ -75,7 +75,7 @@ class Adjust(object):
                 query = self.query()
                 if "application" not in query:
                     query = { "application" : query } # legacy compat.
-                print(json.dumps(query))
+                print('{}\n'.format(json.dumps(query)), end='')
                 sys.exit(0)
             except Exception as e:
                 self.print_json_error(
@@ -106,7 +106,7 @@ class Adjust(object):
             else:
                 self.adjust() # LEGACY mode
             # if the above didn't raise an exception, all done (empty completion data, status 'ok')
-            print(json.dumps(dict(status='ok')))
+            print('{}\n'.format(json.dumps(dict(status='ok'))), end='')
         except Exception as e:
             self.print_json_error(
                 e.__class__.__name__,
@@ -122,12 +122,12 @@ class Adjust(object):
         '''
         Prints JSON formatted error
         '''
-        print(json.dumps(
+        print('{}\n'.format(json.dumps(
             {
                 "error": error,
                 "class": cl,
                 "message": message
-            }), flush=True)
+            })), end='', flush=True)
 
     ##################################################
     #     METHODS THAT MUST BE OVERWRITTEN
