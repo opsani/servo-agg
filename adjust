@@ -6,6 +6,8 @@ import signal
 
 import subprocess
 
+from adjust import Adjust, AdjustError
+
 import json
 # 'compact' format json encode (no spaces)
 json_enc = json.JSONEncoder(separators=(",",":")).encode
@@ -66,6 +68,17 @@ def merge_settings(dest, src):
 
     return
 
+def merge_monitoring(dest, src):
+    """merge src['settings'] into dest['settings'], raise exception if the
+    same monitoring key is defined in both"""
+
+    for mn,mv in src.get("monitoring",{}).items():
+        if mn in dest:
+            raise ValueError(mn)
+        dest[mn] = mv
+
+    return
+
 def _query(app_id='app'):
     comps = {}
 
@@ -76,8 +89,13 @@ def _query(app_id='app'):
         g_state[d] = q
 
     # merge after all data is collected
+    descriptor = {"application" : { "components" : {}}, "monitoring": {}}
+    comps = descriptor['application']['components']
+    monitoring = descriptor['monitoring']
+
     for d,info in drivers:
         # TODO: s[application] (global app settings not supported for now)
+        merge_monitoring(monitoring, g_state[d])
         for cn, cd in g_state[d]["application"]["components"].items():
             c = comps.setdefault(cn, {})
             try:
@@ -87,7 +105,7 @@ def _query(app_id='app'):
                 # NOTE we don't keep track where the first one came from, just report the current driver as the culprit
                 raise ValueError("{}: duplicate setting for component {}: {}".format(os.path.basename(d), cn, str(x)))
 
-    return {"application" : { "components" : comps }}
+    return descriptor
 
 
 def _adjust(app_id, new_settings):
@@ -150,9 +168,9 @@ def _adjust(app_id, new_settings):
     for d,s in p_status.items():
         if s["status"] == "ok": continue
         msg.append("{}: {}: {}".format(os.path.basename(d), s["status"], s.get("message","")))
-    raise Exception( "\n".join(msg) )
+    raise AdjustError( "\n".join(msg), status=s["status"], reason=s["reason"] )
 
-class A(adjust.Adjust):
+class A(Adjust):
 
     def query(self):
         return _query()
