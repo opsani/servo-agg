@@ -68,17 +68,6 @@ def merge_settings(dest, src):
 
     return
 
-def merge_monitoring(dest, src):
-    """merge src['settings'] into dest['settings'], raise exception if the
-    same monitoring key is defined in both"""
-
-    for mn,mv in src.get("monitoring",{}).items():
-        if mn in dest:
-            raise ValueError(mn)
-        dest[mn] = mv
-
-    return
-
 def _query(app_id='app'):
     comps = {}
 
@@ -95,7 +84,7 @@ def _query(app_id='app'):
 
     for d,info in drivers:
         # TODO: s[application] (global app settings not supported for now)
-        merge_monitoring(monitoring, g_state[d])
+        monitoring.update(g_state[d].get("monitoring",{}))
         for cn, cd in g_state[d]["application"]["components"].items():
             c = comps.setdefault(cn, {})
             try:
