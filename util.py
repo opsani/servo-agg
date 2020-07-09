@@ -151,6 +151,8 @@ def run_and_track(path, *args, data = None, progress_cb: typing.Callable[..., No
     if rc != 0: # error, add verbose info to returned data
         if not rsp.get("status"): # NOTE if driver didn't return any json, status will be "nodata". Preferably, it should print structured data even on failures, so errors can be reported neatly.
             rsp["status"] = "failed"
+        if not rsp.get("reason"):
+            rsp["reason"] = "unknown"
         m = rsp.get("message", "")
         # if config[report_stderr]:
         rs = os.environ.get("OPTUNE_VERBOSE_STDERR", "all") # FIXME: default setting?
