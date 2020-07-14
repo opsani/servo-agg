@@ -25,7 +25,11 @@ def run(path, *args, data = None):
         data = json_enc(data).encode("UTF-8")
     r = subprocess.check_output([path]+list(args), input = data)
 
-    return json.loads(r.decode("UTF-8"))
+    try:
+        output = r.decode("UTF-8")
+        return json.loads(output)
+    except json.decoder.JSONDecodeError as error:
+        raise AdjustError(f"JSON decoding of subprocess output failed:\n{output}") from error
 
 
 def locate_drivers():
