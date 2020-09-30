@@ -95,6 +95,9 @@ def _adjust(app_id, new_settings):
     comps = q["application"]["components"]
     comp_settings = new_settings.get("application",{}).get("components",{})
 
+    if not drivers:
+        print({"status": "ok", "reason": "no-drivers"})
+        return
 
     # prepare data for all drivers first (skipping those with nothing to do)
     run_lst = []
@@ -115,6 +118,10 @@ def _adjust(app_id, new_settings):
             if "control" in new_settings:
                 driver_data["control"] = new_settings["control"]
             run_lst.append((d, driver_data))
+
+    if not run_lst:
+        print({"status": "ok", "reason": "no-settings-to-adjust"})
+        return
 
     # progress ratios - assume all driver have equal weight
     p = 1.0/float(len(run_lst))
