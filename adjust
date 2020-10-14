@@ -109,7 +109,7 @@ def _adjust(app_id, new_settings):
             # print("C:", cn)
             for sn, sv in cs.get("settings",{}).items():
                 # print("    S:", sn)
-                new_setting = comp_settings.get(cn,{}).get("settings",{}).get(sn,None)
+                new_setting = comp_settings.get(cn,{}).get("settings",{}).pop(sn,None)
                 if new_setting is not None:
                     dsettings.setdefault(cn,{}).setdefault("settings",{})[sn] = new_setting
 
@@ -118,6 +118,11 @@ def _adjust(app_id, new_settings):
             if "control" in new_settings:
                 driver_data["control"] = new_settings["control"]
             run_lst.append((d, driver_data))
+
+    # Gather any comp whose settings have not all been popped out
+    unrecognized_sett_comps = { k: v for k, v in comp_settings.items() if v.get("settings") }
+    if unrecognized_sett_comps:
+        raise Exception("Incompatible settings found in input payload: {}".format(unrecognized_sett_comps))
 
     if not run_lst:
         print({"status": "ok", "reason": "no-settings-to-adjust"})
