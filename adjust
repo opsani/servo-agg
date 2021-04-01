@@ -144,7 +144,10 @@ def _adjust(app_id, new_settings):
             p_progress[d] = p
             total = int ( sum( (v * p_weight[k] for k,v in p_progress.items()) ) * 100.0 )
             if total>100: total = 100
-            print ( json_enc( {"progress": total} ), flush = True )
+            print_json = {"progress": total}
+            if args.get('message'):
+                print_json['message'] = args['message']
+            print ( json_enc( print_json ), flush = True )
         #
         s = run_and_track(d, app_id, progress_cb = cbk, data = data )
         p_status[d] = s
