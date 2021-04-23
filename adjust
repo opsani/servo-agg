@@ -163,6 +163,8 @@ def _adjust(app_id, new_settings):
     # failure: cook a message from all failed drivers
     msg = []
     combined_status="failed"
+    # In the promote use case, there will only be one reason. Account for multiple to best effort handle other use cases
+    reasons = []
     for d,s in p_status.items():
         if s["status"] == "ok": continue
 
@@ -170,8 +172,12 @@ def _adjust(app_id, new_settings):
         if s["status"] == "rejected" or combined_status != "rejected":
             combined_status = s["status"]
 
+        if s.get("reason"):
+            reasons.append(s["reason"])
+
         msg.append("{}: {}: {}".format(os.path.basename(d), s["status"], s.get("message","")))
-    raise adjust.AdjustError( "\n".join(msg), status=combined_status )
+    combined_reasons = ", ".join(reasons) if reasons else None
+    raise adjust.AdjustError( "\n".join(msg), status=combined_status, reason=combined_reasons)
 
 class A(adjust.Adjust):
 
