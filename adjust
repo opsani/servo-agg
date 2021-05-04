@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from collections import defaultdict
 import sys
 import os
 import signal
@@ -102,7 +101,6 @@ def _adjust(app_id, new_settings):
 
     # prepare data for all drivers first (skipping those with nothing to do)
     run_lst = []
-    missing_sett_comps = defaultdict(list)
     for d,info in drivers:
         # extract settings for this driver only
         dsettings = {}
@@ -114,8 +112,6 @@ def _adjust(app_id, new_settings):
                 new_setting = comp_settings.get(cn,{}).get("settings",{}).pop(sn,None)
                 if new_setting is not None:
                     dsettings.setdefault(cn,{}).setdefault("settings",{})[sn] = new_setting
-                else:
-                    missing_sett_comps[cn].append(sn)
 
         if dsettings: # skip if there's nothing for this driver
             driver_data = {"application": {"components": dsettings}}
@@ -127,9 +123,6 @@ def _adjust(app_id, new_settings):
     unrecognized_sett_comps = { k: v for k, v in comp_settings.items() if v.get("settings") }
     if unrecognized_sett_comps:
         raise Exception("Incompatible settings found in input payload: {}".format(unrecognized_sett_comps))
-
-    if missing_sett_comps:
-        raise Exception("Not all configured settings were accounted for in input payload: {}".format(missing_sett_comps))
 
     if not run_lst:
         print({"status": "ok", "reason": "no-settings-to-adjust"})
