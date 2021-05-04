@@ -151,7 +151,10 @@ def _adjust(app_id, new_settings):
             p_progress[d] = p
             total = int ( sum( (v * p_weight[k] for k,v in p_progress.items()) ) * 100.0 )
             if total>100: total = 100
-            print ( json_enc( {"progress": total} ), flush = True )
+            print_json = {"progress": total}
+            if args.get('message'):
+                print_json['message'] = args['message']
+            print ( json_enc( print_json ), flush = True )
         #
         s = run_and_track(d, app_id, progress_cb = cbk, data = data )
         p_status[d] = s
@@ -167,6 +170,8 @@ def _adjust(app_id, new_settings):
     # failure: cook a message from all failed drivers
     msg = []
     combined_status="failed"
+    # In the promote use case, there will only be one reason. Account for multiple to best effort handle other use cases
+    reasons = []
     for d,s in p_status.items():
         if s["status"] == "ok": continue
 
@@ -174,8 +179,12 @@ def _adjust(app_id, new_settings):
         if s["status"] == "rejected" or combined_status != "rejected":
             combined_status = s["status"]
 
+        if s.get("reason"):
+            reasons.append(s["reason"])
+
         msg.append("{}: {}: {}".format(os.path.basename(d), s["status"], s.get("message","")))
-    raise adjust.AdjustError( "\n".join(msg), status=combined_status )
+    combined_reasons = ", ".join(reasons) if reasons else None
+    raise adjust.AdjustError( "\n".join(msg), status=combined_status, reason=combined_reasons)
 
 class A(adjust.Adjust):
 
