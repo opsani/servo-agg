@@ -21,7 +21,7 @@ def run(path, *args, data = None):
 
     if data:
         data = json_enc(data).encode("UTF-8")
-    r = subprocess.check_output([path]+list(args), input = data)
+    r = subprocess.check_output([path]+list(args), input = data, stderr=subprocess.STDOUT)
 
     return json.loads(r.decode("UTF-8"))
 
